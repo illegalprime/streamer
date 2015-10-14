@@ -5,6 +5,13 @@
         <script type="text/javascript" src="./streamer.js"></script>
     </head>
     <body>
-        <canvas id="video" width="640" height="480" />
+        <canvas class="streamer-video" width="640" height="480" />
+        <script type="text/javascript">
+            window.onload = function() {
+                streamers({
+                    canvas: ".streamer-video",
+                });
+            };
+        </script>
     </body>
 </html>
