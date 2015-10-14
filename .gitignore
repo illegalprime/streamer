@@ -12,3 +12,6 @@
 
 # Vim
 .*.swp
+
+# NPM Package
+node_modules

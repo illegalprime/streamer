@@ -1,0 +1,30 @@
+{
+  "name": "streamer-server",
+  "version": "1.0.0",
+  "description": "Serve up jpegs through websockets",
+  "main": "index.js",
+  "dependencies": {
+      "ws": "*"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/illegalprime/streamer.git"
+  },
+  "keywords": [
+    "v4l",
+    "v4l2",
+    "camera",
+    "webcam",
+    "live",
+    "video"
+  ],
+  "author": "Michael Eden",
+  "license": "GPL-2.0",
+  "bugs": {
+    "url": "https://github.com/illegalprime/streamer/issues"
+  },
+  "homepage": "https://github.com/illegalprime/streamer#readme"
+}

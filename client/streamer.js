@@ -90,7 +90,7 @@ var loadB64 = function() {
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
     };
     image.src = "data:image/jpg;base64," + IMG_BASE64;
-}
+};
 
 var loadBin = function() {
     var blob = new Blob([IMAGE], {
@@ -104,6 +104,43 @@ var loadBin = function() {
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
     };
     image.src = url;
+};
+
+var defaults = {
+    server: "ws://127.0.0.1:9998/",
+    canvas: ".streamer-video",
+};
+
+var streamers = function(options) {
+    var opts = _.extend(defaults, options);
+    var protocol = "jpeg-meta";
+
+    var canvases;
+    if (_.isString(opts.canvas)) {
+        canvases = document.querySelectorAll(opts.canvas);
+    } else if (_.isFunction(opts.canvas)) {
+        canvases = opts.canvas();
+    }
+    var contexts = _.map(canvases, function(canvas) {
+        return canvas.getContext("2d");
+    });
+
+    var conn = new WebSocket(opts.server, protocol);
+    conn.binaryType = "blob";
+
+    var jpgToCanvas = function(jpeg, context) {
+        var img_url = URL.createObjectURL(jpeg);
+        var image = new Image();
+        image.onload = function() {
+            URL.revokeObjectURL(img_url);
+            context.drawImage(image, 0, 0, image.width, image.height);
+        };
+        image.src = img_url;
+    };
+
+    conn.onmessage = function(event) {
+        _.each(contexts, jpgToCanvas.bind(undefined, event.data));
+    };
 };
 
 window.onload = loadBin;
