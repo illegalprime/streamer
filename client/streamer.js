@@ -17,7 +17,7 @@ var streamers;
         } else if (_.isFunction(opts.canvas)) {
             canvases = opts.canvas();
         } else {
-            throw new Error("canvas field must be a function or a CSS selector");
+            throw new Error("'canvas' must be a function or a CSS selector");
         }
         var contexts = _.map(canvases, function(canvas) {
             return canvas.getContext("2d");
