@@ -4,7 +4,9 @@
   "description": "Serve up jpegs through websockets",
   "main": "index.js",
   "dependencies": {
-      "ws": "*"
+    "jpeg-fresh": "^2.0.10",
+    "v4l2camera": "^0.4.3",
+    "ws": "^0.8.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
