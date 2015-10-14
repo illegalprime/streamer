@@ -2,12 +2,14 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::mpsc::channel;
 
-pub struct Fountain<T> {
+#[derive(Clone)]
+pub struct Fountain<T>
+where T: Send + Sync {
     senders: Vec<Sender<Arc<T>>>,
 }
 
 impl<T> Fountain<T>
-where T: Sync {
+where T: Send + Sync {
     fn new() -> Self {
         Fountain {
             senders: Vec::new(),

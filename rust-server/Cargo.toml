@@ -5,4 +5,4 @@ authors = ["Michael Eden <themichaeleden@gmail.com>"]
 
 [dependencies]
 rscam = "*"
-websocket = "*"
+websocket = { git = "https://github.com/illegalprime/rust-websocket.git" }

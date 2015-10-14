@@ -1,5 +1,6 @@
 mod fountain;
 mod webcam;
+mod ws;
 
 use std::thread::sleep_ms;
 use std::fs::File;
@@ -13,7 +14,7 @@ fn main() {
     loop {
 	    let frame = camera.capture().unwrap();
 		let mut file = File::create("frame.jpg").unwrap();
-		file.write_all(&frame[..]).unwrap(); 
+		file.write_all(&frame[..]).unwrap();
 		sleep_ms(refresh_ms);
     }
 }

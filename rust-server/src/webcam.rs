@@ -8,6 +8,11 @@ use self::rscam::{Camera, Config, FormatInfo, ResolutionInfo, IntervalInfo};
 const MJPG: &'static [u8] = b"MJPG";
 const MIN_RES: (u32, u32) = (640, 480);
 
+pub enum Message {
+    Frame(Box<[u8]>),
+    UsingTemp,
+}
+
 pub fn camera(path: &str) -> (Camera, u32) {
     let mut camera = Camera::new(path).unwrap();
 
@@ -80,4 +85,3 @@ pub fn camera(path: &str) -> (Camera, u32) {
     let refresh = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u32;
     (camera, refresh)
 }
-
