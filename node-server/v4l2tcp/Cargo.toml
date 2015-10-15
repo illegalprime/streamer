@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Michael <themichaeleden@gmail.com>"]
 
 [dependencies]
-rscam = "*"
+v4l2-quick = { path = "../../v4l2-quick" }

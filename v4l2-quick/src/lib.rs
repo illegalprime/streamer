@@ -2,12 +2,13 @@ extern crate rscam;
 
 use std::cmp::Ordering;
 
-use self::rscam::{Camera, Config, FormatInfo, ResolutionInfo, IntervalInfo};
+pub use self::rscam::{Camera, Config, FormatInfo, ResolutionInfo, IntervalInfo};
+pub use self::rscam::Result as V4l2Result;
 
 const MJPG: &'static [u8] = b"MJPG";
 const MIN_RES: (u32, u32) = (640, 480);
 
-pub fn camera(path: &str) -> (Camera, u32) {
+pub fn camera(path: &str) -> V4l2Result<(Camera, u32)> {
     let mut camera = Camera::new(path).unwrap();
 
     let mut formats: Vec<FormatInfo> = camera.formats()
@@ -77,5 +78,5 @@ pub fn camera(path: &str) -> (Camera, u32) {
 
     camera.start(&config).unwrap();
     let refresh = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u32;
-    (camera, refresh)
+    Ok((camera, refresh))
 }

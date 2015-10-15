@@ -1,78 +1,43 @@
-mod webcam;
-mod fountain;
+extern crate v4l2_quick;
 
-use std::sync::mpsc::channel;
 use std::io::Write;
-use std::sync::{Arc, Mutex};
-use std::thread;
 use std::thread::sleep_ms;
 use std::net::TcpListener;
-use fountain::Fountain;
-
-const CAMERA: &'static str = "/dev/video0";
-const SERVER: &'static str = "127.0.0.1:9997";
-
-pub enum Status {
-    NoClients,
-    ClientsAvailable,
-}
+use std::env::args;
+use std::io::stderr;
+use std::process::exit;
 
 fn main() {
-    let (camera, refresh_ms) = webcam::camera(CAMERA);
-
-    println!("Refresh rate: {}ms", refresh_ms);
-
-    let server = TcpListener::bind(SERVER).unwrap();
-
-    let clients = Arc::new(Mutex::new(Fountain::new()));
-    let listeners = clients.clone();
-
-    let (report, status) = channel();
-    let connections = Arc::new(Mutex::new((0u32, report)));
-    let close_connections = connections.clone();
-    let on_close = Arc::new(move || {
-        let mut connections = close_connections.lock().unwrap();
-        connections.0 -= 1;
-        if connections.0 == 0 {
-            connections.1.send(Status::NoClients).ok();
+    let mut arguments = args();
+    // Program name
+    arguments.next();
+    let camera = arguments.next();
+    let server = arguments.next();
+    match (camera, server) {
+        (Some(c), Some(s)) => start(&c, &s),
+        _ => {
+            writeln!(&mut stderr(),
+                "Usage: ./v4l2tcp <camera path> <listen addr>").ok();
+            exit(1);
         }
-    });
+    }
+}
 
-    thread::spawn(move || {
-        loop {
-            sleep_ms(refresh_ms);
-            if let Ok(Status::NoClients) = status.try_recv() {
-                while let Ok(stat) = status.recv() {
-                    match stat {
-                        Status::ClientsAvailable => break,
-                        _ => continue,
-                    }
-                }
-            }
-            let frame = camera.capture().unwrap();
-            listeners.lock().unwrap().send(frame);
-        }
-    });
+fn start(cam_path: &str, server_addr: &str) {
+    let (camera, refresh_ms) = v4l2_quick::camera(cam_path).unwrap();
+    let server = TcpListener::bind(server_addr).unwrap();
+    println!("Started TCP Server on {} with camera {}.", cam_path, server_addr);
 
     for conn in server.incoming() {
         match conn {
             Ok(mut conn) => {
-                {
-                    let mut connections = connections.lock().unwrap();
-                    connections.0 += 1;
-                    if connections.0 == 1 {
-                        connections.1.send(Status::ClientsAvailable).ok();
+                loop {
+                    sleep_ms(refresh_ms);
+                    let frame = camera.capture().unwrap();
+                    if conn.write_all(&frame[..]).is_err() {
+                        break;
                     }
                 }
-                let frames = clients.lock().unwrap().make_link();
-                let close_handler = on_close.clone();
-                thread::spawn(move || {
-                    while let Ok(frame) = frames.recv() {
-                        if let Err(_) = conn.write_all(&frame[..]) {
-                            close_handler();
-                        }
-                    }
-                });
             },
             Err(_) => continue,
         };
