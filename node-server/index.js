@@ -2,37 +2,29 @@
 "use strict";
 
 var ws = require("ws");
-var samples = require("./res/samples.js");
-var Camera = require("v4l2camera").Camera;
 var EventEmitter = require("events").EventEmitter;
-var Jpeg = require("jpeg-fresh").Jpeg;
+var net = require("net");
+
+var CAMERA_PORT = 9997;
+var LOCALHOST = "127.0.0.1";
 
 var emitter = new EventEmitter();
-
-var camera = new Camera("/dev/video1");
-camera.start();
-var interval = Math.round((1 / 30) * 1000);
-setTimeout(function reframe() {
-    camera.capture(function(success) {
-        if (success) {
-            var frame = new Buffer(camera.toRGB());
-            var jpeg = new Jpeg(frame.data, camera.width, camera.height, "rgb");
-            var encoded = jpeg.encodeSync();
-            emitter.emit("frame", encoded);
-        }
-        setTimeout(reframe, interval);
-    });
-}, interval); // 30 FPS
-
+var camera = new net.Socket();
 var Server = new ws.Server({
     port: 9998,
 });
 
-Server.on("connection", function(client) {
-    emitter.on("frame", function(frame) {
-        client.send(frame, {
-            binary: true,
-            mask: true,
+(function() {
+    camera.connect(CAMERA_PORT, LOCALHOST);
+    camera.on("data", function(data) {
+        emitter.emit("frame", data);
+    });
+    Server.on("connection", function(client) {
+        emitter.on("frame", function(frame) {
+            client.send(frame, {
+                binary: true,
+                mask: true,
+            });
         });
     });
-});
+})();

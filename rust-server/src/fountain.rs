@@ -1,4 +1,4 @@
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, Receiver};
 use std::sync::Arc;
 use std::sync::mpsc::channel;
 
@@ -10,20 +10,22 @@ where T: Send + Sync {
 
 impl<T> Fountain<T>
 where T: Send + Sync {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Fountain {
             senders: Vec::new(),
         }
     }
 
-    fn link(&mut self, sender: Sender<Arc<T>>) {
-        self.senders.push(sender);
-    }
-
-    fn send(&self, data: T) {
+    pub fn send(&self, data: T) {
         let data = Arc::new(data);
         for sender in self.senders.iter() {
-            sender.send(data.clone());
+            sender.send(data.clone()).unwrap();
         }
+    }
+
+    pub fn make_link(&mut self) -> Receiver<Arc<T>> {
+        let (sender, receiver) = channel();
+        self.senders.push(sender);
+        receiver
     }
 }
