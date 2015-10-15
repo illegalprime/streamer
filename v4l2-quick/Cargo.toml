@@ -1,0 +1,7 @@
+[package]
+name = "v4l2-quick"
+version = "0.1.0"
+authors = ["Michael <themichaeleden@gmail.com>"]
+
+[dependencies]
+rscam = "*"

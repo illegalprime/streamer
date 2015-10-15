@@ -1,5 +1,4 @@
-extern crate v4l2_quick;
-
+mod webcam;
 mod fountain;
 
 use std::sync::mpsc::channel;
@@ -19,7 +18,7 @@ pub enum Status {
 }
 
 fn main() {
-    let (camera, refresh_ms) = v4l2_quick::camera(CAMERA);
+    let (camera, refresh_ms) = webcam::camera(CAMERA);
 
     println!("Refresh rate: {}ms", refresh_ms);
 
