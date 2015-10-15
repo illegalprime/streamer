@@ -1,17 +1,11 @@
 extern crate rscam;
 
 use std::cmp::Ordering;
-use std::str::from_utf8;
 
 use self::rscam::{Camera, Config, FormatInfo, ResolutionInfo, IntervalInfo};
 
 const MJPG: &'static [u8] = b"MJPG";
 const MIN_RES: (u32, u32) = (640, 480);
-
-pub enum Message {
-    Frame(Box<[u8]>),
-    UsingTemp,
-}
 
 pub fn camera(path: &str) -> (Camera, u32) {
     let mut camera = Camera::new(path).unwrap();
@@ -48,7 +42,7 @@ pub fn camera(path: &str) -> (Camera, u32) {
             discretes.sort();
             discretes.first().unwrap().clone()
         },
-        ResolutionInfo::Stepwise{ min, max, step } => {
+        ResolutionInfo::Stepwise{ min, step, .. } => {
             if min >= MIN_RES {
                 min
             } else {
@@ -81,7 +75,7 @@ pub fn camera(path: &str) -> (Camera, u32) {
         .. Default::default()
     };
 
-    camera.start(&config);
+    camera.start(&config).unwrap();
     let refresh = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u32;
     (camera, refresh)
 }

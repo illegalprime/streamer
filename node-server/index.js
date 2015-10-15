@@ -21,7 +21,7 @@ setTimeout(function reframe() {
             emitter.emit("frame", encoded);
         }
         setTimeout(reframe, interval);
-    })
+    });
 }, interval); // 30 FPS
 
 var Server = new ws.Server({
