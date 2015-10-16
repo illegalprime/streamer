@@ -34,9 +34,9 @@ pub enum Pref {
 }
 
 pub struct Fmt {
-    emulate: Pref,
-    compress: Pref,
-    priorities: Option<Vec<&'static [u8; 4]>>,
+    pub emulate: Pref,
+    pub compress: Pref,
+    pub priorities: Option<Vec<&'static [u8; 4]>>,
 }
 
 impl Default for Fmt {
@@ -100,7 +100,7 @@ impl Debug for ConfigSummary {
             "    field: {}\n", self.field)));
         try!(fmt.write_fmt(format_args!(
             "    nbuffers: {}\n", self.nbuffers)));
-        fmt.write_str("}\n")
+        fmt.write_str("}")
     }
 }
 
