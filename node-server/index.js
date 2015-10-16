@@ -9,9 +9,10 @@ var spawn = require("child_process").spawn;
 
 var v4l2tcp = path.join(__dirname, "./v4l2tcp/target/release/v4l2tcp");
 
-var CAMERA = "/dev/video1";
+var CAMERA = "/dev/video0";
 var CAM_PORT = 9997;
 var CAM_HOST = "127.0.0.1";
+var MAX_LISTENERS = 10;
 
 var emitter = new EventEmitter();
 var camera = new net.Socket();
@@ -21,6 +22,7 @@ var Server = new ws.Server({
 
 (function() {
     spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
+    emitter.setMaxListeners(MAX_LISTENERS);
     var clients = 0;
     while (true) {
         try {
@@ -37,7 +39,7 @@ var Server = new ws.Server({
         clients++;
         if (clients === 1) {
             // TODO
-        } else if (clients === emitter.getMaxListeners()) {
+        } else if (clients === MAX_LISTENERS) {
             return;
         }
         var send_frame = function(frame) {
