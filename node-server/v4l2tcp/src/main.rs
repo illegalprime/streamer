@@ -23,7 +23,7 @@ use v4l2_quick::*;
 const CLIENT: Token = Token(0);
 const SERVER: Token = Token(1);
 const TIMEOUT: Token = Token(2);
-const USAGE: &'static str = "Usage: ./v4l2tcp <camera path> <listen addr>";
+const USAGE: &'static str = "<camera path> <listen addr>";
 
 #[derive(Debug)]
 struct Connection {
@@ -70,6 +70,7 @@ impl CamServer {
         }
     }
 
+    // TODO: Cache results
     fn camera_fast(path: &str) -> Result<(Camera, u64), ()> {
         // Best configuration for highest Framerate
         // without going below 640x480
@@ -185,7 +186,8 @@ impl Handler for CamServer {
                     // read message into a buffer
                     let mut buf = String::new();
                     // Return data read
-                    client.stream.read_to_string(&mut buf).map(|_| buf)
+                    client.stream.read_to_string(&mut buf).ok();
+                    buf
                 } else {
                     return;
                 }
@@ -193,8 +195,8 @@ impl Handler for CamServer {
                 return;
             };
             println!("Message: {:?}", &message);
-            match message.as_ref().map(|s| s as &str) {
-                Ok("capture") => {
+            match message.trim_right() {
+                "capture" => {
                     // Stop the current camera
                     self.camera.stop().ok();
                     // Find one that has really good quality
@@ -211,24 +213,20 @@ impl Handler for CamServer {
                     // set our camera to the old one.
                     self.camera = old_cam;
                 },
-                Ok("shutdown") => {
+                "shutdown" => {
                     // Destroy everything
                     event_loop.shutdown();
                 },
-                Ok("pause") => {
+                "pause" => {
                     // Clear the timeout and subsequent frame captures
                     if let Some(timeout) = self.timeout {
                         event_loop.clear_timeout(timeout);
                         self.timeout = None;
                     }
                 },
-                Ok("resume") => {
+                "resume" => {
                     // Start a new timer and capture frames
                     self.timeout = event_loop.timeout_ms(TIMEOUT, 0u64).ok();
-                },
-                Err(_) => {
-                    // Remove the client
-                    // self.client = None;
                 },
                 _ => return,
             };
@@ -287,14 +285,13 @@ fn start(cam_path: String, server_addr: &str) {
 
 fn main() {
     let mut arguments = args();
-    // First arg is program name
-    arguments.next();
+    let program = arguments.next().unwrap();
     let camera = arguments.next();
     let server = arguments.next();
     match (camera, server) {
         (Some(c), Some(s)) => start(c, &s),
         _ => {
-            writeln!(&mut stderr(), "{}", USAGE).ok();
+            writeln!(&mut stderr(), "Usage: {} {}", program, USAGE).ok();
             exit(1);
         }
     }
