@@ -24,17 +24,17 @@ var Server = new ws.Server({
     // spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
     emitter.setMaxListeners(MAX_LISTENERS);
     var clients = 0;
-    while (true) {
-        try {
-            camera.connect(CAM_PORT, CAM_HOST);
-            break;
-        } catch(err) {
-            continue;
-        }
-    }
+    var connect = function() {
+        camera.connect(CAM_PORT, CAM_HOST);
+    };
+    camera.on("error", function() {
+        console.log("Trying to reconnect");
+        setTimeout(connect, 1000);
+    });
     camera.on("data", function(data) {
         emitter.emit("frame", data);
     });
+    connect();
     Server.on("connection", function(client) {
         clients++;
         if (clients === 1) {
