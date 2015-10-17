@@ -1,8 +1,0 @@
-[package]
-name = "spy"
-version = "0.1.0"
-authors = ["Michael Eden <themichaeleden@gmail.com>"]
-
-[dependencies]
-v4l2-quick = { path = "../v4l2-quick" }
-websocket = { git = "https://github.com/illegalprime/rust-websocket.git" }
