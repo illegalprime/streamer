@@ -21,7 +21,7 @@ var Server = new ws.Server({
 });
 
 (function() {
-    spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
+    // spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
     emitter.setMaxListeners(MAX_LISTENERS);
     var clients = 0;
     while (true) {

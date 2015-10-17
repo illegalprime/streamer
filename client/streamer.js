@@ -3,7 +3,7 @@ var streamers;
 (function() {
     "use strict";
     var defaults = {
-        server: "ws://10.0.0.231:9998/",
+        server: "ws://127.0.0.1:9998/",
         canvas: ".streamer-video",
     };
 

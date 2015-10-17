@@ -11,6 +11,7 @@ use std::io::stderr;
 use std::process::exit;
 use mio::EventLoop;
 use mio::EventLoopConfig;
+use mio::Timeout;
 use mio::Handler;
 use mio::EventSet;
 use mio::PollOpt;
@@ -25,15 +26,25 @@ const TIMEOUT: Token = Token(2);
 const USAGE: &'static str = "Usage: ./v4l2tcp <camera path> <listen addr>";
 
 #[derive(Debug)]
-struct Connection(TcpStream);
+struct Connection {
+    stream: TcpStream,
+    can_write: bool,
+}
 
 impl Connection {
+    fn new(stream: TcpStream) -> Self {
+        Connection {
+            stream: stream,
+            can_write: false,
+        }
+    }
+
     fn reregister(&self, event_loop: &mut EventLoop<CamServer>) {
         event_loop.reregister(
-            &self.0,
+            &self.stream,
             CLIENT,
             EventSet::readable() | EventSet::error() | EventSet::hup(),
-            PollOpt::edge());
+            PollOpt::level()).unwrap();
     }
 }
 
@@ -42,6 +53,19 @@ struct CamServer {
     interval: u64,
     server: TcpListener,
     client: Option<Connection>,
+    timeout: Option<Timeout>,
+}
+
+impl CamServer {
+    fn new(camera: Camera, server: TcpListener, ms: u64) -> Self {
+        CamServer {
+            camera: camera,
+            interval: ms,
+            server: server,
+            client: None,
+            timeout: None,
+        }
+    }
 }
 
 impl Handler for CamServer {
@@ -49,7 +73,7 @@ impl Handler for CamServer {
     type Message = ();
 
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
-        println!("token: {:?}, events: {:?}", &token, &events);
+        println!("LOOP: {:?} with {:?}", token, &events);
         // If we are handling server events
         if token == SERVER {
             // If the server is readable
@@ -65,13 +89,13 @@ impl Handler for CamServer {
                         // Register this stream
                         // We only want to know when there is data available from the
                         // client
-                        let connection = Connection(stream);
+                        let connection = Connection::new(stream);
                         // Register this with the event loop
                         event_loop.register_opt(
-                            &connection.0,
+                            &connection.stream,
                             CLIENT,
                             EventSet::all(),
-                            PollOpt::edge());
+                            PollOpt::edge()).unwrap();
                         // Save the client
                         self.client = Some(connection);
                     },
@@ -91,45 +115,74 @@ impl Handler for CamServer {
                 // Put this client back in the event loop
                 client.reregister(event_loop);
                 if events.is_writable() {
-                    // We can write to this thing! Send the frames!
-                    event_loop.timeout_ms(TIMEOUT, 0u64);
+                    // We can write to this thing! Remember it!
+                    client.can_write = true;
                 }
                 if events.is_readable() {
                     // read message into a buffer
                     let mut buf = String::new();
                     // Return data read
-                    client.0.read_to_string(&mut buf).map(|_| buf)
+                    client.stream.read_to_string(&mut buf).map(|_| buf)
                 } else {
                     return;
                 }
             } else {
                 return;
             };
+            println!("Message: {:?}", &message);
             match message.as_ref().map(|s| s as &str) {
-                Ok("picture") => { /* TODO */ },
-                Ok("shutdown") => { /* TODO */ },
+                Ok("capture") => {
+
+                },
+                Ok("shutdown") => {
+                    // Destroy everything
+                    event_loop.shutdown();
+                },
+                Ok("pause") => {
+                    // Clear the timeout and subsequent frame captures
+                    if let Some(timeout) = self.timeout {
+                        event_loop.clear_timeout(timeout);
+                        self.timeout = None;
+                    }
+                },
+                Ok("resume") => {
+                    // Start a new timer and capture frames
+                    self.timeout = event_loop.timeout_ms(TIMEOUT, 0u64).ok();
+                },
                 Err(_) => {
-                    // Remove the client if it can no
-                    // longer be read from
-                    self.client = None;
-                }
+                    // Remove the client
+                    // self.client = None;
+                },
                 _ => return,
             };
         }
     }
 
-    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, timeout: Self::Timeout) {
+    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, token: Self::Timeout) {
+        // Record the time so we have an estimate of how long this takes
+        let start = time::precise_time_ns();
         // Check if we have a client, if not implicitly stop the timeout cycle
         if let Some(ref mut client) = self.client {
+            // Check if we can write to the client
+            if !client.can_write {
+                // Wait until we can write
+                event_loop.timeout_ms(token, self.interval).ok();
+                return;
+            }
             // Get a frame from the camera
             if let Ok(frame) = self.camera.capture() {
                 // Send it to the client
-                if client.0.write_all(&frame[..]).is_ok() {
-                    // If it went ok, do it again soon
-                    println!("FRAME {}", time::precise_time_ns());
-                    event_loop.timeout_ms(timeout, 33u64);
-                } else {
-                    // TODO: Remove client
+                if client.stream.write_all(&frame[..]).is_ok() {
+                    // Guess how much longer we should wait until we go again
+                    let used = time::precise_time_ns() - start;
+                    let timeout = if used > self.interval {
+                        0
+                    } else {
+                        self.interval - used
+                    };
+                    println!("FRAME!");
+                    // If sending went ok, do it again soon
+                    self.timeout = event_loop.timeout_ms(token, timeout).ok();
                 }
             }
         }
@@ -184,6 +237,7 @@ fn start(cam_path: &str, server_addr: &str) {
         interval: refresh_ms,
         server: server,
         client: None,
+        timeout: None,
     };
 
     event_loop.register(&cams.server, SERVER).unwrap();
