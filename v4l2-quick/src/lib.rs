@@ -321,19 +321,21 @@ fn get_config(camera: &Camera, reqs: Constraints) -> Option<ConfigSummary> {
     None
 }
 
-pub fn camera(path: &str, reqs: Constraints) -> V4l2Result<(Camera, Option<ConfigSummary>)> {
+pub fn configure(path: &str, reqs: Constraints) -> V4l2Result<Option<ConfigSummary>> {
+    let camera = try!(Camera::new(path));
+    Ok(get_config(&camera, reqs))
+}
+
+pub fn start(path: &str, reqs: &ConfigSummary) -> V4l2Result<Camera> {
     let mut camera = try!(Camera::new(path));
-    let possible_config = get_config(&camera, reqs);
-    if let Some(config) = possible_config.clone() {
-        try!(camera.start(&Config {
-            interval: config.interval,
-            resolution: config.resolution,
-            format: &config.format[..],
-            field: config.field,
-            nbuffers: config.nbuffers,
-        }));
-    }
-    Ok((camera, possible_config))
+    try!(camera.start(&Config {
+        interval: reqs.interval,
+        resolution: reqs.resolution,
+        format: &reqs.format[..],
+        field: reqs.field,
+        nbuffers: reqs.nbuffers,
+    }));
+    Ok(camera)
 }
 
 #[test]
