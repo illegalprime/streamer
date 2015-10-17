@@ -54,16 +54,79 @@ struct CamServer {
     server: TcpListener,
     client: Option<Connection>,
     timeout: Option<Timeout>,
+    cam_path: String,
 }
 
 impl CamServer {
-    fn new(camera: Camera, server: TcpListener, ms: u64) -> Self {
+    fn new(cam_path: String, server: TcpListener) -> Self {
+        let (camera, refresh) = CamServer::camera_fast(&cam_path).unwrap();
         CamServer {
             camera: camera,
-            interval: ms,
+            interval: refresh,
             server: server,
             client: None,
             timeout: None,
+            cam_path: cam_path,
+        }
+    }
+
+    fn camera_fast(path: &str) -> Result<(Camera, u64), ()> {
+        // Best configuration for highest Framerate
+        // without going below 640x480
+        let constraints = Constraints {
+            formats: Some(Fmt {
+                emulate: Pref::DoNotPrefer,
+                compress: Pref::Prefer,
+                priorities: Some(vec![b"MJPG"]),
+            }),
+            resolutions: Some(Res {
+                dir: Dir::Lowest,
+                limit: Some((640, 480)),
+            }),
+            speeds: Some(Speed {
+                dir: Dir::Highest,
+                limit: None,
+            }),
+            .. Default::default()
+        };
+        // Get the camera
+        let (camera, config) = v4l2_quick::camera(path, constraints).unwrap();
+        let config = match config {
+            Some(c) => c,
+            None => return Err(()),
+        };
+        // Find the timeout for the frame of the camera
+        let interval = config.interval;
+        let refresh_ms = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u64;
+        Ok((camera, refresh_ms))
+    }
+
+    fn camera_quality(path: &str) -> Result<Camera, ()> {
+        // Best quality!
+        let constraints = Constraints {
+            formats: Some(Fmt {
+                emulate: Pref::NoPreference,
+                compress: Pref::DoNotPrefer,
+                priorities: Some(vec![b"MJPG"]),
+            }),
+            resolutions: Some(Res {
+                dir: Dir::Highest,
+                limit: None,
+            }),
+            speeds: None,
+            .. Default::default()
+        };
+        // Get the camera
+        let found = v4l2_quick::camera(path, constraints);
+        match found {
+            Ok((cam, config)) => {
+                if config.is_some() {
+                    Ok(cam)
+                } else {
+                    Err(())
+                }
+            },
+            Err(_) => Err(()),
         }
     }
 }
@@ -132,7 +195,21 @@ impl Handler for CamServer {
             println!("Message: {:?}", &message);
             match message.as_ref().map(|s| s as &str) {
                 Ok("capture") => {
-
+                    // Stop the current camera
+                    self.camera.stop().ok();
+                    // Find one that has really good quality
+                    let camera = CamServer::camera_quality(&self.cam_path).unwrap();
+                    // Get a picture from the good camera
+                    if let Ok(frame) = camera.capture() {
+                        if let Some(ref mut client) = self.client {
+                            // Send the picture to the client
+                            client.stream.write_all(&frame[..]).ok();
+                        }
+                    }
+                    // Find the original, faster camera
+                    let (old_cam, _) = CamServer::camera_fast(&self.cam_path).unwrap();
+                    // set our camera to the old one.
+                    self.camera = old_cam;
                 },
                 Ok("shutdown") => {
                     // Destroy everything
@@ -189,57 +266,21 @@ impl Handler for CamServer {
     }
 }
 
-fn start(cam_path: &str, server_addr: &str) {
-    // Best configuration for highest Framerate
-    // without going below 640x480
-    let constraints = Constraints {
-        formats: Some(Fmt {
-            emulate: Pref::DoNotPrefer,
-            compress: Pref::Prefer,
-            priorities: Some(vec![b"MJPG"]),
-        }),
-        resolutions: Some(Res {
-            dir: Dir::Lowest,
-            limit: Some((640, 480)),
-        }),
-        speeds: Some(Speed {
-            dir: Dir::Highest,
-            limit: None,
-        }),
-        .. Default::default()
-    };
-    // Get the camera
-    let (camera, config) = v4l2_quick::camera(cam_path, constraints).unwrap();
-    let config = match config {
-        Some(c) => c,
-        None => panic!("Configuration not found!"),
-    };
+fn start(cam_path: String, server_addr: &str) {
     // Create the TCP Server
     let address = SocketAddr::from_str(server_addr).unwrap();
     let server = TcpListener::bind(&address).unwrap();
-    // Find the timeout for the frame of the camera
-    let interval = config.interval;
-    let refresh_ms = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u64;
 
     // Make an event loop
     let mut event_loop = EventLoop::configured(EventLoopConfig {
         timer_tick_ms: 1u64,
         .. Default::default()
     }).unwrap();
-    // Print status
-    println!("Started TCP Server on {} with camera {}.", cam_path, server_addr);
-    println!("Camera settings: {:?}", &config);
-    println!("Refresh rate: {}ms", refresh_ms);
 
     // Server
-    let mut cams = CamServer {
-        camera: camera,
-        interval: refresh_ms,
-        server: server,
-        client: None,
-        timeout: None,
-    };
+    let mut cams = CamServer::new(cam_path, server);
 
+    // Start event loop
     event_loop.register(&cams.server, SERVER).unwrap();
     event_loop.run(&mut cams).unwrap();
 }
@@ -251,7 +292,7 @@ fn main() {
     let camera = arguments.next();
     let server = arguments.next();
     match (camera, server) {
-        (Some(c), Some(s)) => start(&c, &s),
+        (Some(c), Some(s)) => start(c, &s),
         _ => {
             writeln!(&mut stderr(), "{}", USAGE).ok();
             exit(1);
