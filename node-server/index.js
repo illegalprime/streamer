@@ -28,7 +28,7 @@ var Server = new ws.Server({
         camera.connect(CAM_PORT, CAM_HOST);
     };
     camera.on("error", function() {
-        console.log("Trying to reconnect");
+        console.log("Reconnecting...");
         setTimeout(connect, 1000);
     });
     camera.on("data", function(data) {
@@ -38,7 +38,7 @@ var Server = new ws.Server({
     Server.on("connection", function(client) {
         clients++;
         if (clients === 1) {
-            // TODO
+            camera.write("resume");
         } else if (clients === MAX_LISTENERS) {
             return;
         }
@@ -52,10 +52,13 @@ var Server = new ws.Server({
                 emitter.removeListener("frame", send_frame);
                 clients--;
                 if (clients === 0) {
-                    // TODO
+                    camera.write("pause");
                 }
             }
         };
         emitter.on("frame", send_frame);
     });
+    var shutdown = function() {
+        camera.write("shutdown");
+    };
 })();
