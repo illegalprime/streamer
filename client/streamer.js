@@ -1,4 +1,4 @@
-var streamers;
+var Streamers;
 
 (function() {
     "use strict";
@@ -7,9 +7,13 @@ var streamers;
         canvas: ".streamer-video",
     };
 
-    streamers = function(options) {
+    Streamers = function(options) {
         var opts = _.extend(defaults, options);
         var protocol = "jpeg-meta";
+        var self = this;
+        var paused = false;
+        var taking_picture = false;
+        var want_picture = [];
 
         var canvases;
         if (_.isString(opts.canvas)) {
@@ -37,7 +41,38 @@ var streamers;
         };
 
         conn.onmessage = function(event) {
-            _.each(contexts, jpgToCanvas.bind(undefined, event.data));
+            if (event.data.size > 1) {
+                if (!paused) {
+                    _.each(contexts, jpgToCanvas.bind(undefined, event.data));
+                }
+            } else {
+                // Received special message from server
+            }
+        };
+
+        self.photograph = function(done) {
+            want_picture.push(done);
+            if (taking_picture) {
+                return;
+            }
+            conn.send("capture");
+            taking_picture = true;
+        };
+
+        self.pause = function() {
+            if (paused) {
+                return;
+            }
+            conn.send("pause");
+            paused = true;
+        };
+
+        self.resume = function() {
+            if (!paused) {
+                return;
+            }
+            conn.send("resume");
+            paused = false;
         };
     };
 })();

@@ -16,14 +16,30 @@ var MAX_LISTENERS = 10;
 
 var emitter = new EventEmitter();
 var camera = new net.Socket();
-var Server = new ws.Server({
+var server = new ws.Server({
     port: 9998,
 });
 
 (function() {
     // spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
     emitter.setMaxListeners(MAX_LISTENERS);
+
+    // Handle counting of clients
     var clients = 0;
+    var decrement_clients = function() {
+        clients--;
+        if (clients === 0) {
+            camera.write("pause");
+        }
+    };
+    var increment_clients = function() {
+        clients++;
+        if (clients === 1) {
+            camera.write("resume");
+        }
+    };
+
+    // Connect to TCP camera connection
     var connect = function() {
         camera.connect(CAM_PORT, CAM_HOST);
     };
@@ -35,13 +51,33 @@ var Server = new ws.Server({
         emitter.emit("frame", data);
     });
     connect();
-    Server.on("connection", function(client) {
-        clients++;
-        if (clients === 1) {
-            camera.write("resume");
-        } else if (clients === MAX_LISTENERS) {
+
+    // Handle incomming clients
+    server.on("connection", function(client) {
+        // Boot if we have too many
+        if (clients === MAX_LISTENERS) {
             return;
         }
+
+        // Is the client paused?
+        var paused = false;
+        // Available camera commands
+        var commands = {
+            capture: camera.write.bind(camera, "capture"),
+            pause: function() {
+                decrement_clients();
+                paused = true;
+            },
+            resume: function() {
+                increment_clients();
+                paused = false;
+            },
+        };
+
+        // Add to client count
+        increment_clients();
+
+        // Send every image to this client
         var send_frame = function(frame) {
             try {
                 client.send(frame, {
@@ -50,14 +86,23 @@ var Server = new ws.Server({
                 });
             } catch (err) {
                 emitter.removeListener("frame", send_frame);
-                clients--;
-                if (clients === 0) {
-                    camera.write("pause");
+                if (!paused) {
+                    decrement_clients();
                 }
             }
         };
         emitter.on("frame", send_frame);
+
+        // Handle messages from clients
+        client.on("message", function(message) {
+            var comm = commands[message];
+            if (comm) {
+                comm();
+            }
+        });
     });
+
+    // Turn off the camera server
     var shutdown = function() {
         camera.write("shutdown");
     };

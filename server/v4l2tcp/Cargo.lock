@@ -72,7 +72,8 @@ dependencies = [
 
 [[package]]
 name = "rscam"
-version = "0.5.2"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -96,7 +97,7 @@ dependencies = [
 name = "v4l2-quick"
 version = "0.1.0"
 dependencies = [
- "rscam 0.5.2",
+ "rscam 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
