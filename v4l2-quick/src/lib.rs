@@ -326,8 +326,7 @@ pub fn configure(path: &str, reqs: Constraints) -> V4l2Result<Option<ConfigSumma
     Ok(get_config(&camera, reqs))
 }
 
-pub fn start(path: &str, reqs: &ConfigSummary) -> V4l2Result<Camera> {
-    let mut camera = try!(Camera::new(path));
+pub fn start(camera: &mut Camera, reqs: &ConfigSummary) -> V4l2Result<()> {
     try!(camera.start(&Config {
         interval: reqs.interval,
         resolution: reqs.resolution,
@@ -335,5 +334,5 @@ pub fn start(path: &str, reqs: &ConfigSummary) -> V4l2Result<Camera> {
         field: reqs.field,
         nbuffers: reqs.nbuffers,
     }));
-    Ok(camera)
+    Ok(())
 }

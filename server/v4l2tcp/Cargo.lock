@@ -30,7 +30,7 @@ name = "kernel32-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "winapi 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -72,8 +72,7 @@ dependencies = [
 
 [[package]]
 name = "rscam"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.5.2"
 dependencies = [
  "libc 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -97,7 +96,7 @@ dependencies = [
 name = "v4l2-quick"
 version = "0.1.0"
 dependencies = [
- "rscam 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rscam 0.5.2",
 ]
 
 [[package]]

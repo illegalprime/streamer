@@ -50,10 +50,10 @@ impl Connection {
 }
 
 struct CameraData {
-    // Path to camera '/dev/video0'
+    // Like /dev/video0
     path: String,
     // Camera handle
-    handle: Camera,
+    handle: Option<Camera>,
     // Config for the fastest framerate
     fastest: ConfigSummary,
     // Config for the best quality
@@ -117,34 +117,40 @@ impl CamServer {
         let interval = framerate.interval;
         let refresh = ((interval.0 as f32 / interval.1 as f32) * 1000. + 0.5) as u64;
         // Lets start with the fast camera
-        let camera = match v4l2_quick::start(&cam_path, &framerate) {
-            Ok(cam) => cam,
-            _ => return Err(()),
-        };
+        let mut camera = Camera::new(&cam_path).unwrap();
+        v4l2_quick::start(&mut camera, &framerate).unwrap();
         // Cache configs for faster switching
         Ok(CamServer {
             server: server,
             client: None,
             timeout: None,
             camera: CameraData {
-                path: cam_path,
-                handle: camera,
+                handle: Some(camera),
                 fastest: framerate,
                 best: quality,
                 interval: refresh,
+                path: cam_path,
             },
         })
     }
 
     fn camera_fast(&mut self) -> V4l2Result<()> {
-        // Get the camera (old camera is descructed)
-        self.camera.handle = try!(v4l2_quick::start(&self.camera.path, &self.camera.fastest));
+        // Get rid of the old camera
+        self.camera.handle = None;
+        // Make a new one with the 'fast' config
+        let mut camera = try!(Camera::new(&self.camera.path));
+        try!(v4l2_quick::start(&mut camera, &self.camera.fastest));
+        self.camera.handle = Some(camera);
         Ok(())
     }
 
     fn camera_quality(&mut self) -> V4l2Result<()> {
-        // Get the camera (old camera is descructed)
-        self.camera.handle = try!(v4l2_quick::start(&self.camera.path, &self.camera.best));
+        // Get rid of the old camera
+        self.camera.handle = None;
+        // Make a new one with the 'fast' config
+        let mut camera = try!(Camera::new(&self.camera.path));
+        try!(v4l2_quick::start(&mut camera, &self.camera.best));
+        self.camera.handle = Some(camera);
         Ok(())
     }
 }
@@ -217,7 +223,7 @@ impl Handler for CamServer {
                     // Find one that has really good quality
                     self.camera_quality().unwrap();
                     // Get a picture from the good camera
-                    if let Ok(frame) = self.camera.handle.capture() {
+                    if let Ok(frame) = self.camera.handle.as_mut().unwrap().capture() {
                         if let Some(ref mut client) = self.client {
                             // Send the picture to the client
                             client.stream.write_all(&frame[..]).ok();
@@ -258,7 +264,7 @@ impl Handler for CamServer {
                 return;
             }
             // Get a frame from the camera
-            if let Ok(frame) = self.camera.handle.capture() {
+            if let Ok(frame) = self.camera.handle.as_mut().unwrap().capture() {
                 // Send it to the client
                 if client.stream.write_all(&frame[..]).is_ok() {
                     // Guess how much longer we should wait until we go again
