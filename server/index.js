@@ -14,6 +14,9 @@ var CAM_PORT = 9997;
 var CAM_HOST = "127.0.0.1";
 var MAX_LISTENERS = 10;
 
+var FULL_IMAGE_PREFIX = new Buffer([0x55]);
+var CAMERA_IN_USE     = new Buffer([0x33]);
+
 var emitter = new EventEmitter();
 var camera = new net.Socket();
 var server = new ws.Server({
@@ -21,7 +24,6 @@ var server = new ws.Server({
 });
 
 (function() {
-    // spawn(v4l2tcp, [CAMERA, CAM_HOST + ":" + CAM_PORT]);
     emitter.setMaxListeners(MAX_LISTENERS);
 
     // Handle counting of clients
@@ -48,7 +50,10 @@ var server = new ws.Server({
         setTimeout(connect, 1000);
     });
     camera.on("data", function(data) {
-        emitter.emit("frame", data);
+        if (data[0] !== 0xff) {
+            console.log(data[0]);
+        }
+        emitter.emit("data", data);
     });
     connect();
 
@@ -63,7 +68,10 @@ var server = new ws.Server({
         var paused = false;
         // Available camera commands
         var commands = {
-            capture: camera.write.bind(camera, "capture"),
+            capture: function() {
+                camera.write("capture");
+                emitter.emit("data", CAMERA_IN_USE);
+            },
             pause: function() {
                 decrement_clients();
                 paused = true;
@@ -78,20 +86,20 @@ var server = new ws.Server({
         increment_clients();
 
         // Send every image to this client
-        var send_frame = function(frame) {
+        var send = function(data) {
             try {
-                client.send(frame, {
+                client.send(data, {
                     binary: true,
                     mask: false,
                 });
             } catch (err) {
-                emitter.removeListener("frame", send_frame);
+                emitter.removeListener("data", send);
                 if (!paused) {
                     decrement_clients();
                 }
             }
         };
-        emitter.on("frame", send_frame);
+        emitter.on("data", send);
 
         // Handle messages from clients
         client.on("message", function(message) {

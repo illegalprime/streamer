@@ -19,12 +19,14 @@ use mio::Token;
 use mio::tcp::TcpListener;
 use mio::tcp::TcpStream;
 use v4l2_quick::{Dir, Pref, Constraints, ConfigSummary, Res};
-use v4l2_quick::{Fmt, Speed, V4l2Result, Camera};
+use v4l2_quick::{Fmt, Speed, V4l2Result, Camera, Frame};
 
 const CLIENT: Token = Token(0);
 const SERVER: Token = Token(1);
 const TIMEOUT: Token = Token(2);
 const USAGE: &'static str = "<camera path> <listen addr>";
+
+const FULL_IMAGE_PREFIX: [u8; 1] = [0x55];
 
 #[derive(Debug)]
 struct Connection {
@@ -67,6 +69,7 @@ struct CamServer {
     server: TcpListener,
     client: Option<Connection>,
     timeout: Option<Timeout>,
+    pending: Option<Frame>,
 }
 
 impl CamServer {
@@ -225,7 +228,9 @@ impl Handler for CamServer {
                     // Get a picture from the good camera
                     if let Ok(frame) = self.camera.handle.as_mut().unwrap().capture() {
                         if let Some(ref mut client) = self.client {
-                            // Send the picture to the client
+                            // Write prefix so client knows this is high res
+                            client.stream.write(&FULL_IMAGE_PREFIX).ok();
+                            // Write the jpeg
                             client.stream.write_all(&frame[..]).ok();
                         }
                     }
@@ -237,6 +242,7 @@ impl Handler for CamServer {
                     event_loop.shutdown();
                 },
                 "pause" => {
+                    println!("Pausing.");
                     // Clear the timeout and subsequent frame captures
                     if let Some(timeout) = self.timeout {
                         event_loop.clear_timeout(timeout);
@@ -244,6 +250,7 @@ impl Handler for CamServer {
                     }
                 },
                 "resume" => {
+                    println!("Sarting to burst frames!");
                     // Start a new timer and capture frames
                     self.timeout = event_loop.timeout_ms(TIMEOUT, 0u64).ok();
                 },
@@ -274,7 +281,6 @@ impl Handler for CamServer {
                     } else {
                         self.camera.interval - used
                     };
-                    println!("FRAME!");
                     // If sending went ok, do it again soon
                     self.timeout = event_loop.timeout_ms(token, timeout).ok();
                 }

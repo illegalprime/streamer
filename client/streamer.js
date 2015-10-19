@@ -47,6 +47,7 @@ var Streamers;
         conn.onmessage = function(event) {
             if (event.data.size === 1) {
                 // Received special message from server
+                console.log("SPECIAL MESSAGE", event.data);
             } else {
                 buffer.push(event.data);
                 if (event.data.size < MAX_PACKET_SIZE) {
