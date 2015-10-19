@@ -59,7 +59,6 @@ var Streamers;
                     } else {
                         blob = event.data;
                     }
-                    console.log(blob.size);
                     if (!paused) {
                         _.each(contexts, jpgToCanvas.bind(undefined, blob));
                     }

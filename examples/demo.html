@@ -6,9 +6,11 @@
     </head>
     <body>
         <canvas class="streamer-video" width="640" height="480"></canvas>
+        <br/>
         <button id="take-picture">Take Picture!</button>
         <button id="pause-video">Pause</button>
         <button id="resume-video">Resume</button>
+        <br/>
         <canvas class="full-picture" width="640" height="480"></canvas>
         <script type="text/javascript">
             window.onload = function() {
@@ -16,7 +18,6 @@
                     canvas: ".streamer-video",
                 });
                 document.getElementById("take-picture").addEventListener("click", function() {
-                    console.log("TAKING PICTURE!");
                     streamer.photograph();
                 });
                 document.getElementById("resume-video").addEventListener("click", function() {
