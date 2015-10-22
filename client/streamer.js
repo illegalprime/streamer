@@ -5,6 +5,7 @@ var Streamers;
     var defaults = {
         server: "ws://127.0.0.1:9998/",
         canvas: ".streamer-video",
+        image: ".full-picture",
     };
     var FULL_IMAGE_PREFIX = 0x55;
     var CAMERA_IN_USE = 0x33;
@@ -16,6 +17,7 @@ var Streamers;
         var self = this;
         var paused = false;
         var taking_picture = false;
+        var waiting_for_highres = false;
         var want_picture = [];
 
         var canvases;
@@ -37,30 +39,51 @@ var Streamers;
             var img_url = URL.createObjectURL(jpeg);
             var image = new Image();
             image.onload = function() {
-                URL.revokeObjectURL(img_url);
+                // URL.revokeObjectURL(img_url);
                 context.drawImage(image, 0, 0, image.width, image.height);
             };
             image.src = img_url;
         };
 
+        var handleServerMessage = function(flag) {
+            if (flag === FULL_IMAGE_PREFIX) {
+                console.log("HIGH RES COMMING");
+            } else if (flag === CAMERA_IN_USE) {
+                // waiting_for_highres = true;
+                console.log("CAMERA IN USE");
+            }
+        };
+
         var buffer = [];
         conn.onmessage = function(event) {
-            if (event.data.size === 1) {
-                // Received special message from server
-                console.log("SPECIAL MESSAGE", event.data);
+            if (event.data.size === 1 && buffer.length === 0) {
+                // Use a file reader to decode because js is awful
+                // https://jsperf.com/array-buffer-blob
+                var reader = new FileReader();
+                reader.onload = function() {
+                    var generated = reader.result;
+                    var view = new Uint8Array(generated);
+                    handleServerMessage(view[0]);
+                };
+                reader.readAsArrayBuffer(event.data);
             } else {
                 buffer.push(event.data);
                 if (event.data.size < MAX_PACKET_SIZE) {
-                    var blob;
-                    if (buffer.length > 0) {
-                        blob = new Blob(buffer, {
-                            type: "image/jpeg"
+                    var blob = new Blob(buffer, {
+                        type: "image/jpeg"
+                    });
+                    buffer = [];
+                    var BIG = 219632;
+                    if (blob.size > 100000) {
+                        console.log("GOT BIG BLOB", blob.size);
+                        var img_url = URL.createObjectURL(blob);
+                        _.each(want_picture, function(callback) {
+                            callback(img_url);
                         });
-                        buffer = [];
-                    } else {
-                        blob = event.data;
-                    }
-                    if (!paused) {
+                        waiting_for_highres = false;
+                        taking_picture = false;
+                        want_picture = [];
+                    } else if (!paused) {
                         _.each(contexts, jpgToCanvas.bind(undefined, blob));
                     }
                 }
@@ -69,9 +92,9 @@ var Streamers;
 
         self.photograph = function(done) {
             want_picture.push(done);
-            // if (taking_picture) {
-            //     return;
-            // }
+            if (taking_picture) {
+                return;
+            }
             conn.send("capture");
             taking_picture = true;
         };

@@ -16,6 +16,8 @@ var MAX_LISTENERS = 10;
 
 var FULL_IMAGE_PREFIX = new Buffer([0x55]);
 var CAMERA_IN_USE     = new Buffer([0x33]);
+var MAX_PACKET_SIZE   = 65536;
+var END_OF_JPEG       = 0xd9;
 
 var emitter = new EventEmitter();
 var camera = new net.Socket();
@@ -50,10 +52,15 @@ var server = new ws.Server({
         setTimeout(connect, 1000);
     });
     camera.on("data", function(data) {
-        if (data[0] !== 0xff) {
-            console.log(data[0]);
+        if (data.length < MAX_PACKET_SIZE
+                && data[data.length - 1] !== END_OF_JPEG) {
+            emitter.emit("data", data.slice(-1));
+            setImmediate(function() {
+                emitter.emit("data", data);
+            });
+        } else {
+            emitter.emit("data", data);
         }
-        emitter.emit("data", data);
     });
     connect();
 

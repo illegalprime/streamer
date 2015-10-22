@@ -11,14 +11,24 @@
         <button id="pause-video">Pause</button>
         <button id="resume-video">Resume</button>
         <br/>
-        <canvas class="full-picture" width="640" height="480"></canvas>
+        <canvas id="full-picture" width="1600" height="1200"></canvas>
         <script type="text/javascript">
             window.onload = function() {
                 var streamer = new Streamers({
                     canvas: ".streamer-video",
                 });
                 document.getElementById("take-picture").addEventListener("click", function() {
-                    streamer.photograph();
+                    streamer.photograph(function(img_url) {
+                        console.log("GOT PICTURE!");
+                        var canvas = document.getElementById("full-picture");
+                        var image = new Image();
+                        var context = canvas.getContext("2d");
+                        image.onload = function() {
+                            console.log(image);
+                            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        };
+                        image.src = img_url;
+                    });
                 });
                 document.getElementById("resume-video").addEventListener("click", function() {
                     streamer.resume();

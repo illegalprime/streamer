@@ -19,7 +19,7 @@ use mio::Token;
 use mio::tcp::TcpListener;
 use mio::tcp::TcpStream;
 use v4l2_quick::{Dir, Pref, Constraints, ConfigSummary, Res};
-use v4l2_quick::{Fmt, Speed, V4l2Result, Camera, Frame};
+use v4l2_quick::{Fmt, Speed, V4l2Result, Camera};
 
 const CLIENT: Token = Token(0);
 const SERVER: Token = Token(1);
@@ -69,7 +69,6 @@ struct CamServer {
     server: TcpListener,
     client: Option<Connection>,
     timeout: Option<Timeout>,
-    pending: Option<Frame>,
 }
 
 impl CamServer {
@@ -150,6 +149,7 @@ impl CamServer {
     fn camera_quality(&mut self) -> V4l2Result<()> {
         // Get rid of the old camera
         self.camera.handle = None;
+        std::thread::sleep_ms(2000);
         // Make a new one with the 'fast' config
         let mut camera = try!(Camera::new(&self.camera.path));
         try!(v4l2_quick::start(&mut camera, &self.camera.best));
@@ -228,10 +228,10 @@ impl Handler for CamServer {
                     // Get a picture from the good camera
                     if let Ok(frame) = self.camera.handle.as_mut().unwrap().capture() {
                         if let Some(ref mut client) = self.client {
-                            // Write prefix so client knows this is high res
-                            client.stream.write(&FULL_IMAGE_PREFIX).ok();
                             // Write the jpeg
                             client.stream.write_all(&frame[..]).ok();
+                            // Write prefix so client knows this is high res
+                            client.stream.write_all(&FULL_IMAGE_PREFIX).ok();
                         }
                     }
                     // Find the original, faster camera
